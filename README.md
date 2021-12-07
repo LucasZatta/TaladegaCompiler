@@ -25,7 +25,7 @@ echo nada
 
 ## Contributors
 - Eduardo Alves de Freitas
-- Lucas Santo Zatta
+- Lucas Santos Zatta
 - Matheus Dutra Cerbino
 
 ## ISSUES
