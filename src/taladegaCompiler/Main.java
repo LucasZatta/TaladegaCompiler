@@ -1,31 +1,34 @@
 package taladegaCompiler;
 
+import customExceptions.LexicalException;
 import lexicalAnalyzer.LexicalAnalyzer;
-
+import lexicalAnalyzer.SymbolTable;
 
 public class Main {
-    public static final String textFile = "$a != $b";
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
         var fileName = "input.txt";
 
-        if(args.length > 0)
+        if (args.length > 0)
             fileName = args[0];
 
         try {
-            var token = LexicalAnalyzer.scan();
+            var symbolTable = new SymbolTable();
+            var lexicalAnalyzer = new LexicalAnalyzer(fileName, symbolTable);
+            var token = lexicalAnalyzer.scan();
             while (token != null) {
 
-                System.out.println("Token: < " + token.TokenType + ", " + token.identifier + " >");
+                System.out.println(token);
 
-                token =  LexicalAnalyzer.scan();
+                token = lexicalAnalyzer.scan();
             }
 
+            symbolTable.print();
+        } catch (LexicalException e) {
+            System.err.println(e.getError());
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            System.err.println(e.getMessage());
         }
     }
-
-
 }
 

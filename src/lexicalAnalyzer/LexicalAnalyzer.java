@@ -1,28 +1,29 @@
 package lexicalAnalyzer;
 
-import taladegaCompiler.Main;
+import customExceptions.LexicalException;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 
 public class LexicalAnalyzer {
 
-    private String fileName;
-    private FileReader fileReader;
+    private final FileReader fileReader;
     private int currentLine = -1;
     private int currentColumn = -1; // TODO: Check if it will be implemented
 
     private int currentReading = 0;
-    private boolean readNextChar = false;
+    private boolean readNextChar = true;
 
-    public LexicalAnalyzer(String fileName) throws IOException {
-        this.fileName = fileName;
-        var file = new File(this.fileName);
+    private final SymbolTable symbolTable;
+
+    public LexicalAnalyzer(String fileName, SymbolTable symbolTable) throws IOException {
+        this.symbolTable = symbolTable;
+
+        var file = new File(fileName);
         this.fileReader = new FileReader(file);
 
-        currentLine = 0;
+        currentLine = 1;
         currentColumn = 0;
     }
 
@@ -31,12 +32,13 @@ public class LexicalAnalyzer {
         var wordBuffer = new StringBuilder();
         int state = 0;
 
-        var tokenLineStart = currentLine;
-        var tokenColumnStart = currentColumn;
+        token.LineStart = currentLine;
+        token.ColumnStart = currentColumn;
 
         while (currentReading != -1) {
             if (readNextChar) {
                 currentReading = this.fileReader.read();
+                if (currentReading == -1 && state != 20) break;
                 currentColumn++;
             } else {
                 readNextChar = true;
@@ -54,17 +56,14 @@ public class LexicalAnalyzer {
                 if (Character.isWhitespace(ch))
                     continue;
 
-                tokenLineStart = currentLine;
-                tokenColumnStart = currentColumn;
+                token.LineStart = currentLine;
+                token.ColumnStart = currentColumn;
 
                 wordBuffer.append(ch);
 
                 switch (ch) {
                     case '{': // literal
                         state = 1;
-                        continue;
-                    case '\'': // char_const
-                        state = 2;
                         continue;
                     case '*': // mult_operator
                         token.TokenType = TokenType.OPERATOR_MUL;
@@ -74,11 +73,11 @@ public class LexicalAnalyzer {
                         token.TokenType = TokenType.OPERATOR_DIV;
                         token.Value = wordBuffer.toString();
                         return token;
-                    case '+': //
+                    case '+': // plus_sign
                         token.TokenType = TokenType.OPERATOR_PLUS;
                         token.Value = wordBuffer.toString();
                         return token;
-                    case '-':
+                    case '-': // minus_sign
                         token.TokenType = TokenType.OPERATOR_MINUS;
                         token.Value = wordBuffer.toString();
                         return token;
@@ -91,13 +90,13 @@ public class LexicalAnalyzer {
                     case '=': //  Assignment Or "=="
                         state = 5;
                         continue;
-                    case '>':
+                    case '>': // Greater Than Or ">="
                         state = 6;
                         continue;
-                    case '<':
+                    case '<': // Less Than Or "<="
                         state = 7;
                         continue;
-                    case '!':
+                    case '!': // NOT or NOT EQUAL
                         state = 8;
                         continue;
                     case '(':
@@ -120,17 +119,19 @@ public class LexicalAnalyzer {
                         token.TokenType = TokenType.PUNCT_DOT;
                         token.Value = wordBuffer.toString();
                         return token;
+                    case '\'': // char_const
+                        state = 12;
+                        continue;
                     default:
                         if (Character.isDigit(ch)) {
                             state = 9;
                             continue;
                         }
                         if (Character.isLetter(ch)) {
-                            state = 11;
+                            state = 20;
                             continue;
                         }
-                        // TODO: Ajustar excessao
-                        throw new Exception("Invalid character on symbol(POS: " + 0 + " )");
+                        throw new LexicalException(currentLine, currentColumn, wordBuffer, "Invalid Character at beginning of token");
                 }
             }
 
@@ -145,19 +146,8 @@ public class LexicalAnalyzer {
                         token.Value = wordBuffer.toString();
                         return token;
                     }
-                    if (tokenLineStart != currentLine)
-                        // TODO: Ajustar excessao
-                        throw new Exception("Invalid character on symbol(POS: " + 0 + " )");
-
-                    continue;
-                    // --------------------------------------------
-                case 2: // Character Constant reading state
-                    wordBuffer.append(ch);
-                    if (ch == '\'') {
-                        token.TokenType = TokenType.CHAR_CONST;
-                        token.Value = wordBuffer.toString();
-                        return token;
-                    }
+                    if (token.LineStart != currentLine)
+                        throw new LexicalException(currentLine, currentColumn, wordBuffer, "Line Break inside of Literal");
                     continue;
                     // --------------------------------------------
                 case 3: // && Operator reading state
@@ -167,8 +157,7 @@ public class LexicalAnalyzer {
                         token.Value = wordBuffer.toString();
                         return token;
                     }
-                    // TODO: Ajustar excessao
-                    throw new Exception("Invalid character on symbol(POS: " + 0 + " )");
+                    throw new LexicalException(currentLine, currentColumn, wordBuffer, "Invalid Token <" + wordBuffer + ">");
 
                     // --------------------------------------------
                 case 4: // || Operator reading state
@@ -178,8 +167,7 @@ public class LexicalAnalyzer {
                         token.Value = wordBuffer.toString();
                         return token;
                     }
-                    // TODO: Ajustar excessao
-                    throw new Exception("Invalid character on symbol(POS: " + 0 + " )");
+                    throw new LexicalException(currentLine, currentColumn, wordBuffer, "Invalid Token <" + wordBuffer + ">");
 
                     // --------------------------------------------
                 case 5: // ASSIGNMENT or EQUAL state
@@ -238,48 +226,76 @@ public class LexicalAnalyzer {
                     return token;
 
                 // --------------------------------------------
-                case 9: //
-                    wordBuffer.append(ch);
-
-                    if (Character.isDigit(ch))
+                case 9: // integer_const reading state
+                    if (Character.isDigit(ch)){
+                        wordBuffer.append(ch);
                         continue;
+                    }
 
                     if (ch == '.') {
                         state = 10;
                         continue;
                     }
 
-                    if (Character.isWhitespace(ch)) {
+                    if (tokenConstantEndCharacter(ch)) {
+                        readNextChar = false;
+
                         token.TokenType = TokenType.INTEGER_CONST;
                         token.Value = wordBuffer.toString().stripTrailing();
                         return token;
                     }
 
-                    // TODO: Ajustar excessao
-                    throw new Exception("Invalid character on symbol(POS: " + 0 + " )");
+                    throw new LexicalException(currentLine, currentColumn, wordBuffer, "Invalid integer constant");
 
                     // --------------------------------------------
-                case 10: //
+                case 10: // float_const initial reading state
+                    wordBuffer.append(ch);
+
+                    if (Character.isDigit(ch)) {
+                        state = 11;
+                        continue;
+                    }
+
+                    throw new LexicalException(currentLine, currentColumn, wordBuffer, "Invalid float constant");
+
+                case 11: // float_const secondary reading state
                     wordBuffer.append(ch);
 
                     if (Character.isDigit(ch))
                         continue;
 
-                    if (Character.isWhitespace(ch)) {
+                    if (tokenConstantEndCharacter(ch)) {
+                        readNextChar = false;
+
                         token.TokenType = TokenType.FLOAT_CONST;
                         token.Value = wordBuffer.toString().stripTrailing();
                         return token;
                     }
 
-                    // TODO: Ajustar excessao
-                    throw new Exception("Invalid character on symbol(POS: " + 0 + " )");
+                    throw new LexicalException(currentLine, currentColumn, wordBuffer, "Invalid float constant");
 
                     // --------------------------------------------
-                case 11: //
+                case 12: // char_const initial reading state
                     wordBuffer.append(ch);
+                    state = 13;
+                    continue;
 
-                    if (Character.isLetterOrDigit(ch) || ch == '_')
+                    // --------------------------------------------
+                case 13: // char_const secondary reading state
+                    wordBuffer.append(ch);
+                    if (ch == '\'') {
+                        token.TokenType = TokenType.CHAR_CONST;
+                        token.Value = wordBuffer.toString();
+                        return token;
+                    }
+                    throw new LexicalException(currentLine, currentColumn, wordBuffer, "Invalid char constant");
+
+                    // --------------------------------------------
+                case 20: // KEYWORD or IDENTIFIER reading state
+                    if (Character.isLetterOrDigit(ch) || ch == '_') {
+                        wordBuffer.append(ch);
                         continue;
+                    }
 
                     token.Value = wordBuffer.toString().stripTrailing();
 
@@ -334,6 +350,8 @@ public class LexicalAnalyzer {
                             break;
                         default:
                             token.TokenType = TokenType.IDENTIFIER;
+                            symbolTable.registerSymbol(token.Value);
+                            break;
                     }
 
                     readNextChar = false;
@@ -341,12 +359,29 @@ public class LexicalAnalyzer {
 
                 // --------------------------------------------
                 default: // Invalid state
-                    // TODO: Ajustar excessao
-                    throw new Exception("Invalid character on symbol(POS: " + 0 + " )");
+                    throw new LexicalException(currentLine, currentColumn, wordBuffer, "Invalid analyser State <" + state + ">");
             }
         }
 
-        // TODO: Ajustar excessao
-        throw new Exception("Invalid character on symbol(POS: " + 0 + " )");
+        if (state == 0)
+            return null;
+
+        throw new LexicalException(currentLine, currentColumn, wordBuffer, "Unexpected end of file");
+    }
+
+    private boolean tokenConstantEndCharacter(char ch) {
+        return Character.isWhitespace(ch)
+                || ch == ';'
+                || ch == ')'
+                || ch == '+'
+                || ch == '-'
+                || ch == '*'
+                || ch == '/'
+                || ch == '='
+                || ch == '!'
+                || ch == '&'
+                || ch == '|'
+                || ch == '>'
+                || ch == '<';
     }
 }
