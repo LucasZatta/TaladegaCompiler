@@ -1,38 +1,111 @@
 package syntaxAnalyzer;
 
+import customExceptions.CompilerException;
 import customExceptions.SyntaxException;
 import lexicalAnalyzer.LexicalAnalyzer;
-import lexicalAnalyzer.SymbolTable;
 import lexicalAnalyzer.Token;
 import lexicalAnalyzer.TokenType;
 
+import java.util.Arrays;
+import java.util.Stack;
+
 
 public class SyntaxAnalyzer {
-    private LexicalAnalyzer lexicalAnalyzer;
+    private final LexicalAnalyzer lexicalAnalyzer;
     private Token currentToken;
-    private Token nextToken;
+    private final Stack<Token> tokenBuffer = new Stack<>();
 
-    public SyntaxAnalyzer(String fileName, SymbolTable symbolTable) throws Exception {
-        this.lexicalAnalyzer = new LexicalAnalyzer(fileName, symbolTable);
+    private boolean fakeMovement = false;
+    private int currentFakeScope = 0;
+    private final Stack<FakeTokenWrapper> fakeTokenBuffer = new Stack<>();
+
+    public SyntaxAnalyzer(LexicalAnalyzer lexicalAnalyzer) throws Exception {
+        this.lexicalAnalyzer = lexicalAnalyzer;
         this.currentToken = lexicalAnalyzer.scan();
-        this.nextToken = lexicalAnalyzer.scan();
     }
 
-    public void advance() throws Exception{
-        currentToken = nextToken;
-        nextToken = lexicalAnalyzer.scan();
+    private Token getNextToken() throws Exception {
+        if (tokenBuffer.isEmpty())
+            return lexicalAnalyzer.scan();
+        else
+            return tokenBuffer.pop();
+    }
+
+    private void advance() throws Exception {
+        currentToken = getNextToken();
+
+        if (fakeMovement)
+            fakeTokenBuffer.push(new FakeTokenWrapper(currentToken, currentFakeScope));
+    }
+
+    // Initializes a fake reading state where any token read can be reversed
+    private int fake_startFakeMovement() throws Exception {
+        if (fakeMovement)
+            currentFakeScope++;
+        else
+            fakeMovement = true;
+
+        fakeTokenBuffer.push(new FakeTokenWrapper(currentToken, currentFakeScope));
+
+        return currentFakeScope;
+    }
+
+    // Stops fake movement of the specified scope
+    private void fake_stopFakeMovement(int fakeScope) throws Exception {
+        if (!fakeTokenBuffer.isEmpty()) {
+            var fakeToken = fakeTokenBuffer.peek();
+
+            while (!fakeTokenBuffer.isEmpty() && fakeToken.getFakeScope() >= fakeScope) {
+                tokenBuffer.push(fakeToken.getToken());
+                fakeTokenBuffer.pop();
+
+                if (!fakeTokenBuffer.isEmpty()) fakeToken = fakeTokenBuffer.peek();
+            }
+        }
+
+        currentToken = getNextToken();
+
+        currentFakeScope = fakeScope;
+
+        if (fakeScope == 0)
+            fakeMovement = false;
+    }
+
+    // Check if next tokens(including current) match specified function. (Throws internal exception if needed)
+    private boolean checkIfTokensAre_(VoidThrowingFunction function, boolean throwException) throws Exception {
+        var fakeScope = fake_startFakeMovement();
+        try {
+            function.run();
+            return true;
+        } catch (CompilerException exception) {
+            if (throwException)
+                throw exception;
+            return false;
+        } finally {
+            fake_stopFakeMovement(fakeScope);
+        }
+    }
+
+    private boolean checkIfTokensAre_(VoidThrowingFunction function) throws Exception {
+        return checkIfTokensAre_(function, false);
     }
 
     //Slide 27 AnaliseSintatica-Parte1
-    public void eat(TokenType expectedTokenType) throws Exception{
-        if (currentToken.TokenType.equals(expectedTokenType))
+    private void eat(TokenType expectedTokenType) throws Exception {
+        if (expectedTokenType.equals(currentToken.TokenType))
             advance();
         else
-            throw new SyntaxException(currentToken.getLineStart(), currentToken.getColumnStart(), currentToken.Value, "Unexpected Token received");
+            throw new SyntaxException(currentToken, expectedTokenType);
     }
 
-    //Estamos em duvida em casos opcionais como decl_list
-    public void program () throws Exception{
+    public void Analyze() throws Exception {
+        program();
+    }
+
+    // ========================================================
+
+    // ==> program identifier begin [decl-list] stmt-list end "." <==
+    public void program() throws Exception {
         eat(TokenType.KEYWORD_PROGRAM);
         eat(TokenType.IDENTIFIER);
         eat(TokenType.KEYWORD_BEGIN);
@@ -43,48 +116,71 @@ public class SyntaxAnalyzer {
     }
 
 
-    public void decl_list() throws Exception{
-        decl();
-        eat(TokenType.PUNCT_SEMICOLON);
-        //***********Como implementar a repetição opcional ({decl ;})?
+    // ==> decl ";" { decl ";"} <==
+    public void decl_list() throws Exception {
+        while (checkIfTokensAre_(this::decl)) {
+            decl();
+            eat(TokenType.PUNCT_SEMICOLON);
+        }
     }
 
-    public void decl() throws Exception{
+    // ==> ident-list is type <==
+    public void decl() throws Exception {
         ident_list();
         eat(TokenType.KEYWORD_IS);
         type();
     }
 
-
-    public void ident_list() throws Exception{
+    // ==> identifier {"," identifier} <==
+    public void ident_list() throws Exception {
         eat(TokenType.IDENTIFIER);
-        //******Implementar Repetição Opcional ({, identifier})
-    }
 
-    public void type() throws Exception{
-        switch (currentToken.TokenType){
-            case TYPE_INT:
-                eat(TokenType.TYPE_INT);
-                break;
-            case TYPE_FLOAT:
-                eat(TokenType.TYPE_FLOAT);
-                break;
-            case TYPE_CHAR:
-                eat(TokenType.TYPE_CHAR);
-                break;
-            default:
-                throw new SyntaxException(currentToken.getLineStart(), currentToken.getColumnStart(), currentToken.Value, "Unexpected Token received");
+        while (currentToken.TokenType.equals(TokenType.PUNCT_COLON)) {
+            eat(TokenType.PUNCT_COLON);
+            eat(TokenType.IDENTIFIER);
         }
     }
 
-    public void stmt_list() throws Exception{
-        stmt();
-        //******Implementar Repetição Opcional ({; stmt})
+    // ==> int | float | char <==
+    @SuppressWarnings("DuplicatedCode")
+    public void type() throws Exception {
+        switch (currentToken.TokenType) {
+            case TYPE_INT:
+            case TYPE_FLOAT:
+            case TYPE_CHAR:
+                eat(currentToken.TokenType);
+                break;
+            default:
+                throw new SyntaxException(currentToken,
+                        Arrays.asList(TokenType.TYPE_INT, TokenType.TYPE_FLOAT, TokenType.TYPE_CHAR));
+        }
     }
 
-    public void stmt() throws Exception{
-        switch (currentToken.TokenType){
-            case IDENTIFIER://Assign Statement
+
+    // ==> stmt { stmt } <==
+    public void stmt_list() throws Exception {
+        stmt();
+
+        while (checkIfTokensAre_stmt()) {
+            stmt();
+        }
+    }
+
+    // ==> { stmt } <==
+    public boolean checkIfTokensAre_stmt() throws Exception {
+        try {
+            return checkIfTokensAre_(this::stmt, true);
+        } catch (SyntaxException exception) {
+            return !"Invalid Statement Syntax".equals(exception.getMessage());
+        } catch (CompilerException exception) {
+            return false;
+        }
+    }
+
+    // ==> assign-stmt | if-stmt | while-stmt | repeat-stmt | read-stmt | write-stmt  ";" <==
+    public void stmt() throws Exception {
+        switch (currentToken.TokenType) {
+            case IDENTIFIER: //Assign Statement
                 assign_stmt();
                 break;
             case KEYWORD_IF:
@@ -103,22 +199,28 @@ public class SyntaxAnalyzer {
                 write_stmt();
                 break;
             default:
-                throw new SyntaxException(currentToken.getLineStart(), currentToken.getColumnStart(), currentToken.Value, "Unexpected Token received");
+                throw new SyntaxException(currentToken, "Invalid Statement Syntax");
         }
+        eat(TokenType.PUNCT_SEMICOLON);
     }
 
-    public void assign_stmt() throws Exception{
+
+    // ==> identifier "=" simple_expr <==
+    public void assign_stmt() throws Exception {
         eat(TokenType.IDENTIFIER);
         eat(TokenType.ASSIGN);
         simple_expr();
     }
 
-    public void if_stmt() throws Exception{
+
+    // ==>  if condition then stmt-list end
+    // | if condition then stmt-list else stmt-list end <==
+    public void if_stmt() throws Exception {
         eat(TokenType.KEYWORD_IF);
         condition();
         eat(TokenType.KEYWORD_THEN);
         stmt_list();
-        switch(currentToken.TokenType){
+        switch (currentToken.TokenType) {
             case KEYWORD_END:
                 eat(TokenType.KEYWORD_END);
                 break;
@@ -127,143 +229,197 @@ public class SyntaxAnalyzer {
                 stmt_list();
                 eat(TokenType.KEYWORD_END);
             default:
-                throw new SyntaxException(currentToken.getLineStart(), currentToken.getColumnStart(), currentToken.Value, "Unexpected Token received");
+                throw new SyntaxException(currentToken, Arrays.asList(TokenType.KEYWORD_END, TokenType.KEYWORD_ELSE));
         }
-
     }
 
-    public void condition() throws Exception{
+    // ==> expression <==
+    public void condition() throws Exception {
         expression();
     }
 
-    public void repeat_stmt() throws Exception{
+
+    // ==> repeat stmt-list stmt-suffix <==
+    public void repeat_stmt() throws Exception {
         eat(TokenType.KEYWORD_REPEAT);
         stmt_list();
         stmt_suffix();
     }
 
-    public void stmt_suffix() throws Exception{
+    // ==> until conditionx <==
+    public void stmt_suffix() throws Exception {
         eat(TokenType.KEYWORD_UNTIL);
         condition();
     }
 
-    public void while_stmt() throws Exception{
+    // ==> stmt-prefix stmt-list end <==
+    public void while_stmt() throws Exception {
         stmt_prefix();
         stmt_list();
         eat(TokenType.KEYWORD_END);
     }
 
-    public void stmt_prefix() throws Exception{
+    // ==> while condition do <==
+    public void stmt_prefix() throws Exception {
         eat(TokenType.KEYWORD_WHILE);
         condition();
         eat(TokenType.KEYWORD_DO);
     }
 
-    public void read_stmt() throws Exception{
+
+    // ==> read "(" identifier ")" <==
+    public void read_stmt() throws Exception {
         eat(TokenType.KEYWORD_READ);
         eat(TokenType.PUNCT_PARENTHESIS_OPEN);
         eat(TokenType.IDENTIFIER);
         eat(TokenType.PUNCT_PARENTHESIS_CLOSE);
     }
 
-    public void write_stmt() throws Exception{
+    // ==> write "(" writable ")" <==
+    public void write_stmt() throws Exception {
         eat(TokenType.KEYWORD_WRITE);
         eat(TokenType.PUNCT_PARENTHESIS_OPEN);
         writable();
         eat(TokenType.PUNCT_PARENTHESIS_CLOSE);
     }
 
-    public void writable() throws Exception{
-        if(currentToken.TokenType.equals(TokenType.LITERAL))
+    // ==> simple-expr | literal <==
+    public void writable() throws Exception {
+        if (currentToken.TokenType.equals(TokenType.LITERAL))
             eat(TokenType.LITERAL);
         else
             simple_expr();
     }
 
-    public void expression() throws Exception{
+
+    // ==> simple-expr | simple-expr relop simple-expr <==
+    public void expression() throws Exception {
         simple_expr();
-        if(relop(nextToken) != null){
-            eat(relop(nextToken));
+        if (checkIfTokensAre_(this::relop)) {
+            relop();
             simple_expr();
         }
-        //Testar o tratamento de ambiguidade para o expression
     }
 
-    public void simple_expr() throws Exception{
+    // ==> term | simple-expr addop term <==
+    public void simple_expr() throws Exception {
         term();
-        if(addop(nextToken) != null){
-            eat(addop(nextToken));
+        if (checkIfTokensAre_(this::addop)) {
+            addop();
             term();
         }
     }
 
-    public void term() throws Exception{
+    // ==> factor-a | term mulop factor-a <==
+    public void term() throws Exception {
         factor_a();
-        if(mulop(nextToken) != null){
-            eat(mulop(nextToken));
+        if (checkIfTokensAre_(this::mulop)) {
+            mulop();
             factor_a();
         }
     }
 
-    public void factor_a() throws Exception{
-        switch (currentToken.TokenType){
+    // ==> factor | ! factor | "-" factor <==
+    public void factor_a() throws Exception {
+        switch (currentToken.TokenType) {
             case OPERATOR_EXCLAMATION:
-                eat(TokenType.OPERATOR_EXCLAMATION);
             case OPERATOR_MINUS:
-                eat(TokenType.OPERATOR_MINUS);
+                eat(currentToken.TokenType);
+                break;
+            default:
+                break;
         }
         factor();
     }
 
-    public void factor() throws Exception{
-        if(constant(currentToken) != null)
-            eat(constant(currentToken));
-        else if (currentToken.TokenType.equals(TokenType.IDENTIFIER))
+    // ==> identifier | constant | "(" expression ")" <==
+    public void factor() throws Exception {
+        if (checkIfTokensAre_(this::constant))
+            constant();
+        else if (TokenType.IDENTIFIER.equals(currentToken.TokenType))
             eat(TokenType.IDENTIFIER);
-        else if (currentToken.TokenType.equals(TokenType.PUNCT_PARENTHESIS_OPEN)){
+        else if (TokenType.PUNCT_PARENTHESIS_OPEN.equals(currentToken.TokenType)) {
             eat(TokenType.PUNCT_PARENTHESIS_OPEN);
             expression();
             eat(TokenType.PUNCT_PARENTHESIS_CLOSE);
         }
     }
 
-    public TokenType relop(Token token) throws Exception{
-        return switch (token.TokenType) {
-            case OPERATOR_EQ -> TokenType.OPERATOR_EQ;
-            case OPERATOR_GR -> TokenType.OPERATOR_GR;
-            case OPERATOR_GREQ -> TokenType.OPERATOR_GREQ;
-            case OPERATOR_LS -> TokenType.OPERATOR_LS;
-            case OPERATOR_LSEQ -> TokenType.OPERATOR_LSEQ;
-            case OPERATOR_NEQ -> TokenType.OPERATOR_NEQ;
-            default -> null;
-        };
+    // ==> "==" | ">" | ">=" | "<" | "<=" | "!=" <==
+    public void relop() throws Exception {
+        switch (currentToken.TokenType) {
+            case OPERATOR_EQ:
+            case OPERATOR_GR:
+            case OPERATOR_GREQ:
+            case OPERATOR_LS:
+            case OPERATOR_LSEQ:
+            case OPERATOR_NEQ:
+                eat(currentToken.TokenType);
+                break;
+            default:
+                throw new SyntaxException(currentToken,
+                        Arrays.asList(
+                                TokenType.OPERATOR_EQ,
+                                TokenType.OPERATOR_GR,
+                                TokenType.OPERATOR_GREQ,
+                                TokenType.OPERATOR_LS,
+                                TokenType.OPERATOR_LSEQ,
+                                TokenType.OPERATOR_NEQ));
+        }
     }
 
-    public TokenType addop(Token token) throws Exception{
-        return switch (token.TokenType) {
-            case OPERATOR_PLUS -> TokenType.OPERATOR_PLUS;
-            case OPERATOR_MINUS -> TokenType.OPERATOR_MINUS;
-            case OPERATOR_OR -> TokenType.OPERATOR_OR;
-            default -> null;
-        };
+    // ==> "+" | "-" | || <==
+    @SuppressWarnings("DuplicatedCode")
+    public void addop() throws Exception {
+        switch (currentToken.TokenType) {
+            case OPERATOR_PLUS:
+            case OPERATOR_MINUS:
+            case OPERATOR_OR:
+                eat(currentToken.TokenType);
+                break;
+            default:
+                throw new SyntaxException(currentToken,
+                        Arrays.asList(
+                                TokenType.OPERATOR_PLUS,
+                                TokenType.OPERATOR_MINUS,
+                                TokenType.OPERATOR_OR));
+        }
+
     }
 
-    public TokenType mulop(Token token) throws Exception{
-        return switch (token.TokenType) {
-            case OPERATOR_MUL -> TokenType.OPERATOR_MUL;
-            case OPERATOR_DIV -> TokenType.OPERATOR_DIV;
-            case OPERATOR_AND -> TokenType.OPERATOR_AND;
-            default -> null;
-        };
+    // ==> "*" | "/" | && <==
+    @SuppressWarnings("DuplicatedCode")
+    public void mulop() throws Exception {
+        switch (currentToken.TokenType) {
+            case OPERATOR_MUL:
+            case OPERATOR_DIV:
+            case OPERATOR_AND:
+                eat(currentToken.TokenType);
+                break;
+            default:
+                throw new SyntaxException(currentToken,
+                        Arrays.asList(
+                                TokenType.OPERATOR_MUL,
+                                TokenType.OPERATOR_DIV,
+                                TokenType.OPERATOR_AND));
+        }
     }
 
-    public TokenType constant(Token token) throws Exception{
-        return switch (token.TokenType) {
-            case INTEGER_CONST -> TokenType.INTEGER_CONST;
-            case FLOAT_CONST -> TokenType.FLOAT_CONST;
-            case CHAR_CONST -> TokenType.CHAR_CONST;
-            default -> null;
-        };
+    // ==> integer_const | float_const | char_const <==
+    @SuppressWarnings("DuplicatedCode")
+    public void constant() throws Exception {
+        switch (currentToken.TokenType) {
+            case INTEGER_CONST:
+            case FLOAT_CONST:
+            case CHAR_CONST:
+                eat(currentToken.TokenType);
+                break;
+            default:
+                throw new SyntaxException(currentToken,
+                        Arrays.asList(
+                                TokenType.INTEGER_CONST,
+                                TokenType.FLOAT_CONST,
+                                TokenType.CHAR_CONST));
+        }
     }
-
 }

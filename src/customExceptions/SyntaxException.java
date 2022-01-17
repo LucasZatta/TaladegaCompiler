@@ -1,25 +1,56 @@
 package customExceptions;
 
-public class SyntaxException extends Exception{
+import lexicalAnalyzer.Token;
+import lexicalAnalyzer.TokenType;
+
+import java.util.Collection;
+import java.util.stream.Collectors;
+
+public class SyntaxException extends CompilerException {
     private final int line;
     private final int column;
-    private String tokenValue;
+    private Token token;
     private String message = null;
 
-    public SyntaxException(int line, int column, String tokenValue, String message) {
+    @Override
+    public String getMessage() {
+        return message;
+    }
+
+    public SyntaxException(int line, int column, Token token, String message) {
         this.line = line;
         this.column = column;
-        this.tokenValue = tokenValue;
+        this.token = token;
         this.message = message;
     }
 
-    public SyntaxException(int line, int column, String tokenValue) {
-        this(line, column, tokenValue, null);
+    public SyntaxException(Token token, String message) {
+        this(token.LineStart, token.ColumnStart, token, message);
+    }
+
+    public SyntaxException(Token token, Collection<TokenType> expectedTokenTypes) {
+        this(token.LineStart,
+                token.ColumnStart,
+                token,
+                String.format("Unexpected Token (Expected: '%s' | Received: '%s')",
+                        "[" + expectedTokenTypes.stream()
+                                .map(Enum::toString)
+                                .collect(Collectors.joining(",")) + "]",
+                        token.TokenType)
+        );
+    }
+
+    public SyntaxException(Token token, TokenType expectedTokenType) {
+        this(token.LineStart,
+                token.ColumnStart,
+                token,
+                String.format("Unexpected Token (Expected: '%s' | Received: '%s')", expectedTokenType, token.TokenType)
+        );
     }
 
     public String getError() {
         var builder = new StringBuilder()
-                .append("ERROR ==> {")
+                .append("SYNTAX ERROR ==> {")
                 .append(System.lineSeparator())
                 .append("\t[Message]: ").append(message)
                 .append(System.lineSeparator())
@@ -27,7 +58,7 @@ public class SyntaxException extends Exception{
                 .append(System.lineSeparator())
                 .append("\t[Column]: ").append(column)
                 .append(System.lineSeparator())
-                .append("\t[Buffer]: \"").append(tokenValue).append("\"")
+                .append("\t[Token]: \"").append(token).append("\"")
                 .append(System.lineSeparator())
                 .append("}");
 

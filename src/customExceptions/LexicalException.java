@@ -2,7 +2,7 @@ package customExceptions;
 
 import lexicalAnalyzer.Token;
 
-public class LexicalException extends Exception {
+public class LexicalException extends CompilerException {
     private final int line;
     private final int column;
     private StringBuilder wordBuffer;
@@ -21,7 +21,7 @@ public class LexicalException extends Exception {
 
     public String getError() {
         var builder = new StringBuilder()
-                .append("ERROR ==> {")
+                .append("LEXICAL ERROR ==> {")
                 .append(System.lineSeparator())
                 .append("\t[Message]: ").append(message)
                 .append(System.lineSeparator())

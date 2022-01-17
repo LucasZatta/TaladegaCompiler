@@ -4,20 +4,13 @@ public class Token {
     public TokenType TokenType;
     public String Value = "";
 
+    public int TokenNumber = 0;
     public int LineStart = 0;
     // TODO: "Add LineEnd"
     // public Integer LineEnd = null;
     public int ColumnStart = 0;
     // TODO: "Add ColumnEnd"
     // public Integer ColumnEnd = null;
-
-    public int getLineStart(){
-        return LineStart;
-    }
-
-    public int getColumnStart(){
-        return ColumnStart;
-    }
 
     @Override
     public String toString() {

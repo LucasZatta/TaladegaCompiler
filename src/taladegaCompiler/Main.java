@@ -1,8 +1,9 @@
 package taladegaCompiler;
 
-import customExceptions.LexicalException;
+import customExceptions.CompilerException;
 import lexicalAnalyzer.LexicalAnalyzer;
 import lexicalAnalyzer.SymbolTable;
+import syntaxAnalyzer.SyntaxAnalyzer;
 
 public class Main {
 
@@ -15,16 +16,21 @@ public class Main {
         try {
             var symbolTable = new SymbolTable();
             var lexicalAnalyzer = new LexicalAnalyzer(fileName, symbolTable);
-            var token = lexicalAnalyzer.scan();
-            while (token != null) {
+            var syntaxAnalyzer = new SyntaxAnalyzer(lexicalAnalyzer);
 
-                System.out.println(token);
+            syntaxAnalyzer.Analyze();
 
-                token = lexicalAnalyzer.scan();
-            }
+//            var token = lexicalAnalyzer.scan();
+//            while (token != null) {
+//
+//                System.out.println(token);
+//
+//                token = lexicalAnalyzer.scan();
+//            }
 
             symbolTable.print();
-        } catch (LexicalException e) {
+
+        } catch (CompilerException e) {
             System.err.println(e.getError());
         } catch (Exception e) {
             System.err.println(e.getMessage());

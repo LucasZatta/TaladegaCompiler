@@ -9,6 +9,8 @@ import java.io.IOException;
 public class LexicalAnalyzer {
 
     private final FileReader fileReader;
+
+    private int currentTokenNumber = 0;
     private int currentLine = -1;
     private int currentColumn = -1; // TODO: Check if it will be implemented
 
@@ -23,15 +25,19 @@ public class LexicalAnalyzer {
         var file = new File(fileName);
         this.fileReader = new FileReader(file);
 
+        currentTokenNumber = 0;
         currentLine = 1;
         currentColumn = 0;
     }
 
     public Token scan() throws Exception {
+        currentTokenNumber++;
         var token = new Token();
+
         var wordBuffer = new StringBuilder();
         int state = 0;
 
+        token.TokenNumber = currentTokenNumber;
         token.LineStart = currentLine;
         token.ColumnStart = currentColumn;
 
