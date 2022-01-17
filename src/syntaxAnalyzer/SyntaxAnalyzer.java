@@ -92,6 +92,10 @@ public class SyntaxAnalyzer {
 
     //Slide 27 AnaliseSintatica-Parte1
     private void eat(TokenType expectedTokenType) throws Exception {
+        if (currentToken == null)
+            throw new SyntaxException(0, 0, null,
+                    String.format("Unexpected end of file. (Expected: '%s' )", expectedTokenType));
+
         if (expectedTokenType.equals(currentToken.TokenType))
             advance();
         else

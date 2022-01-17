@@ -1,0 +1,13 @@
+program teste6 begin
+ a, b is int;
+ result is float;
+
+ write({A});
+ read(a);
+ write({B});
+ read(b);
+
+ result = (a + b) / b;
+ write({Result:});
+ write(result);
+end
