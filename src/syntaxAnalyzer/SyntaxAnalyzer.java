@@ -298,7 +298,7 @@ public class SyntaxAnalyzer {
         simple_expr();
         if (checkIfTokensAre_(this::relop)) {
             relop();
-            simple_expr();
+            expression();
         }
     }
 
