@@ -1,7 +1,7 @@
 # Compiladores - TaladegaCompiler
 
 **Description**:  Compiler for "Taladega" language
-  - Developed em Java 111
+  - Developed on Java 11
   - Cross Platform (Windows, Linux, MacOS)
   - **Status**:  On Development
 

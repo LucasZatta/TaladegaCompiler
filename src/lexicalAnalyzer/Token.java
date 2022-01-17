@@ -4,6 +4,7 @@ public class Token {
     public TokenType TokenType;
     public String Value = "";
 
+    public int TokenNumber = 0;
     public int LineStart = 0;
     // TODO: "Add LineEnd"
     // public Integer LineEnd = null;

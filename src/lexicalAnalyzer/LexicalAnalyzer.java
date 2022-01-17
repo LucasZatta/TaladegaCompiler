@@ -9,6 +9,8 @@ import java.io.IOException;
 public class LexicalAnalyzer {
 
     private final FileReader fileReader;
+
+    private int currentTokenNumber = 0;
     private int currentLine = -1;
     private int currentColumn = -1; // TODO: Check if it will be implemented
 
@@ -23,15 +25,19 @@ public class LexicalAnalyzer {
         var file = new File(fileName);
         this.fileReader = new FileReader(file);
 
+        currentTokenNumber = 0;
         currentLine = 1;
         currentColumn = 0;
     }
 
     public Token scan() throws Exception {
+        currentTokenNumber++;
         var token = new Token();
+
         var wordBuffer = new StringBuilder();
         int state = 0;
 
+        token.TokenNumber = currentTokenNumber;
         token.LineStart = currentLine;
         token.ColumnStart = currentColumn;
 
@@ -69,10 +75,9 @@ public class LexicalAnalyzer {
                         token.TokenType = TokenType.OPERATOR_MUL;
                         token.Value = wordBuffer.toString();
                         return token;
-                    case '/': // div_operator
-                        token.TokenType = TokenType.OPERATOR_DIV;
-                        token.Value = wordBuffer.toString();
-                        return token;
+                    case '/': // DIV_OPERATOR or Comment initial state
+                        state = 2;
+                        continue;
                     case '+': // plus_sign
                         token.TokenType = TokenType.OPERATOR_PLUS;
                         token.Value = wordBuffer.toString();
@@ -150,6 +155,19 @@ public class LexicalAnalyzer {
                         throw new LexicalException(currentLine, currentColumn, wordBuffer, "Line Break inside of Literal");
                     continue;
                     // --------------------------------------------
+                case 2: // DIV_OPERATOR or Comment initial state
+                    if (ch == '*') {
+                        wordBuffer = new StringBuilder();
+                        state = 100;
+                        continue;
+                    }
+
+                    readNextChar = false;
+                    token.TokenType = TokenType.OPERATOR_DIV;
+                    token.Value = wordBuffer.toString();
+                    return token;
+
+                // --------------------------------------------
                 case 3: // && Operator reading state
                     wordBuffer.append(ch);
                     if (ch == '&') {
@@ -227,7 +245,7 @@ public class LexicalAnalyzer {
 
                 // --------------------------------------------
                 case 9: // integer_const reading state
-                    if (Character.isDigit(ch)){
+                    if (Character.isDigit(ch)) {
                         wordBuffer.append(ch);
                         continue;
                     }
@@ -358,6 +376,22 @@ public class LexicalAnalyzer {
                     return token;
 
                 // --------------------------------------------
+                case 100: // Comment ending '*' reading state
+                    if (ch == '*')
+                        state = 101;
+
+                    continue;
+
+                    // --------------------------------------------
+                case 101: // Comment ending '/' reading state
+                    if (ch == '/')
+                        state = 0;
+                    else
+                        state = 100;
+
+                    continue;
+
+                    // --------------------------------------------
                 default: // Invalid state
                     throw new LexicalException(currentLine, currentColumn, wordBuffer, "Invalid analyser State <" + state + ">");
             }
@@ -366,7 +400,11 @@ public class LexicalAnalyzer {
         if (state == 0)
             return null;
 
-        throw new LexicalException(currentLine, currentColumn, wordBuffer, "Unexpected end of file");
+        if (state == 100 || state == 101)
+            throw new LexicalException(token.LineStart, token.ColumnStart, wordBuffer, "Unclosed comment");
+        else
+            throw new LexicalException(currentLine, currentColumn, wordBuffer, "Unexpected end of file");
+
     }
 
     private boolean tokenConstantEndCharacter(char ch) {

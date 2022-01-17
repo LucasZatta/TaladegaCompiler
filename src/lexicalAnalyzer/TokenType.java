@@ -27,7 +27,7 @@ public enum TokenType {
     KEYWORD_READ, // read
     KEYWORD_WRITE, // write
     // Assign Statements
-    ASSIGN,
+    ASSIGN, // "="
     // Operators
     OPERATOR_EQ, // "=="
     OPERATOR_GR, // ">"

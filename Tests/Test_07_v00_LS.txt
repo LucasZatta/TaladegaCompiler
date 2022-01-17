@@ -1,0 +1,19 @@
+program teste7 begin
+ a, b is int;
+ result is float;
+
+ write({A});
+ read(a);
+ write({B});
+ read(b);
+
+ result = 0;
+
+ repeat
+ result = result + a;
+ b = b - 1;
+ until (b >= 0);
+
+ write({Result:});
+ write(result);
+end.
