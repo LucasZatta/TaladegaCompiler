@@ -8,7 +8,7 @@ import syntaxAnalyzer.SyntaxAnalyzer;
 public class Main {
     public static final int TEST_SELECTOR = 1; // 0 = 'LEXICAL_ANALYZER'; 1 = 'SYNTAX_ANALYZER'
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         var fileName = "input.txt";
 
         if (args.length > 0)
@@ -37,8 +37,6 @@ public class Main {
 
         } catch (CompilerException e) {
             System.err.println(e.getError());
-        } catch (Exception e) {
-            System.err.println(e.getMessage());
         }
     }
 }
