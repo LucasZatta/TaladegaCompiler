@@ -11,6 +11,14 @@ public class Token {
     // TODO: "Add ColumnEnd"
     // public Integer ColumnEnd = null;
 
+    public int getLineStart(){
+        return LineStart;
+    }
+
+    public int getColumnStart(){
+        return ColumnStart;
+    }
+
     @Override
     public String toString() {
         var builder = new StringBuilder()
