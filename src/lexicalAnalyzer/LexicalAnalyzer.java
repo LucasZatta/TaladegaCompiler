@@ -75,10 +75,9 @@ public class LexicalAnalyzer {
                         token.TokenType = TokenType.OPERATOR_MUL;
                         token.Value = wordBuffer.toString();
                         return token;
-                    case '/': // div_operator
-                        token.TokenType = TokenType.OPERATOR_DIV;
-                        token.Value = wordBuffer.toString();
-                        return token;
+                    case '/': // DIV_OPERATOR or Comment initial state
+                        state = 2;
+                        continue;
                     case '+': // plus_sign
                         token.TokenType = TokenType.OPERATOR_PLUS;
                         token.Value = wordBuffer.toString();
@@ -155,6 +154,17 @@ public class LexicalAnalyzer {
                     if (token.LineStart != currentLine)
                         throw new LexicalException(currentLine, currentColumn, wordBuffer, "Line Break inside of Literal");
                     continue;
+                    // --------------------------------------------
+                case 2: // DIV_OPERATOR or Comment initial state
+                    if (ch == '*') {
+                        // TODO: Create comment state
+                    }
+
+                    readNextChar = false;
+                    token.TokenType = TokenType.OPERATOR_DIV;
+                    token.Value = wordBuffer.toString();
+                    return token;
+
                     // --------------------------------------------
                 case 3: // && Operator reading state
                     wordBuffer.append(ch);
@@ -233,7 +243,7 @@ public class LexicalAnalyzer {
 
                 // --------------------------------------------
                 case 9: // integer_const reading state
-                    if (Character.isDigit(ch)){
+                    if (Character.isDigit(ch)) {
                         wordBuffer.append(ch);
                         continue;
                     }

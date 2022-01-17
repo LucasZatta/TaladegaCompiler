@@ -306,7 +306,7 @@ public class SyntaxAnalyzer {
         term();
         if (checkIfTokensAre_(this::addop)) {
             addop();
-            term();
+            simple_expr();
         }
     }
 
@@ -315,7 +315,7 @@ public class SyntaxAnalyzer {
         factor_a();
         if (checkIfTokensAre_(this::mulop)) {
             mulop();
-            factor_a();
+            term();
         }
     }
 
