@@ -157,7 +157,9 @@ public class LexicalAnalyzer {
                     // --------------------------------------------
                 case 2: // DIV_OPERATOR or Comment initial state
                     if (ch == '*') {
-                        // TODO: Create comment state
+                        wordBuffer = new StringBuilder();
+                        state = 100;
+                        continue;
                     }
 
                     readNextChar = false;
@@ -165,7 +167,7 @@ public class LexicalAnalyzer {
                     token.Value = wordBuffer.toString();
                     return token;
 
-                    // --------------------------------------------
+                // --------------------------------------------
                 case 3: // && Operator reading state
                     wordBuffer.append(ch);
                     if (ch == '&') {
@@ -374,6 +376,22 @@ public class LexicalAnalyzer {
                     return token;
 
                 // --------------------------------------------
+                case 100: // Comment ending '*' reading state
+                    if (ch == '*')
+                        state = 101;
+
+                    continue;
+
+                    // --------------------------------------------
+                case 101: // Comment ending '/' reading state
+                    if (ch == '/')
+                        state = 0;
+                    else
+                        state = 100;
+
+                    continue;
+
+                    // --------------------------------------------
                 default: // Invalid state
                     throw new LexicalException(currentLine, currentColumn, wordBuffer, "Invalid analyser State <" + state + ">");
             }
@@ -382,7 +400,11 @@ public class LexicalAnalyzer {
         if (state == 0)
             return null;
 
-        throw new LexicalException(currentLine, currentColumn, wordBuffer, "Unexpected end of file");
+        if (state == 100 || state == 101)
+            throw new LexicalException(token.LineStart, token.ColumnStart, wordBuffer, "Unclosed comment");
+        else
+            throw new LexicalException(currentLine, currentColumn, wordBuffer, "Unexpected end of file");
+
     }
 
     private boolean tokenConstantEndCharacter(char ch) {
