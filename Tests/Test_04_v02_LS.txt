@@ -1,4 +1,5 @@
 program teste4 begin
+/* Teste4 do meu compilador */
  pontuacao, pontuacaoMaxina, disponibilidade is int;
  pontuacaoMinima is char;
 begin

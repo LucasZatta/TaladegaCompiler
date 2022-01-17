@@ -228,6 +228,7 @@ public class SyntaxAnalyzer {
                 eat(TokenType.KEYWORD_ELSE);
                 stmt_list();
                 eat(TokenType.KEYWORD_END);
+                break;
             default:
                 throw new SyntaxException(currentToken, Arrays.asList(TokenType.KEYWORD_END, TokenType.KEYWORD_ELSE));
         }
