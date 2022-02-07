@@ -12,7 +12,7 @@ public class AssignStatement implements Statement {
         this.expression = exp;
     }
 
-    public Identifier getId() {
+    public Identifier getIdentifier() {
         return ident;
     }
 

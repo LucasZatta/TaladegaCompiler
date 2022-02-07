@@ -5,8 +5,16 @@ import customExceptions.SyntaxException;
 import lexicalAnalyzer.LexicalAnalyzer;
 import lexicalAnalyzer.Token;
 import lexicalAnalyzer.TokenType;
+import syntaxAnalyzer.syntaxTree.Declaration;
+import syntaxAnalyzer.syntaxTree.DeclarationList;
+import syntaxAnalyzer.syntaxTree.Identifier;
+import syntaxAnalyzer.syntaxTree.Program;
+import syntaxAnalyzer.syntaxTree.Statements.*;
+import syntaxAnalyzer.syntaxTree.SxExpressions.SxExpressionType;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Stack;
 
 
@@ -91,15 +99,18 @@ public class SyntaxAnalyzer {
     }
 
     //Slide 27 AnaliseSintatica-Parte1
-    private void eat(TokenType expectedTokenType) throws Exception {
+    private Token eat(TokenType expectedTokenType) throws Exception {
         if (currentToken == null)
             throw new SyntaxException(0, 0, null,
                     String.format("Unexpected end of file. (Expected: '%s' )", expectedTokenType));
 
-        if (expectedTokenType.equals(currentToken.TokenType))
+        if (expectedTokenType.equals(currentToken.TokenType)) {
+            var lastEatenToken = currentToken;
             advance();
-        else
+            return lastEatenToken;
+        } else
             throw new SyntaxException(currentToken, expectedTokenType);
+
     }
 
     public void Analyze() throws Exception {
@@ -109,51 +120,69 @@ public class SyntaxAnalyzer {
     // ========================================================
 
     // ==> program identifier begin [decl-list] stmt-list end "." <==
-    public void program() throws Exception {
+    public Program program() throws Exception {
         eat(TokenType.KEYWORD_PROGRAM);
         eat(TokenType.IDENTIFIER);
         eat(TokenType.KEYWORD_BEGIN);
-        decl_list();
-        stmt_list();
+        var declList = decl_list();
+        var stmtList = stmt_list();
         eat(TokenType.KEYWORD_END);
         eat(TokenType.PUNCT_DOT);
+
+        return new Program(stmtList, declList);
     }
 
 
     // ==> decl ";" { decl ";"} <==
-    public void decl_list() throws Exception {
+    public DeclarationList decl_list() throws Exception {
+        var declList = new DeclarationList();
         while (checkIfTokensAre_(this::decl)) {
-            decl();
+            var decl = decl();
+            declList.addElement(decl);
             eat(TokenType.PUNCT_SEMICOLON);
         }
+
+        return declList;
     }
 
     // ==> ident-list is type <==
-    public void decl() throws Exception {
-        ident_list();
+    public Declaration decl() throws Exception {
+        var identList = ident_list();
         eat(TokenType.KEYWORD_IS);
-        type();
+        var type = type();
+        return new Declaration(identList, type);
     }
 
     // ==> identifier {"," identifier} <==
-    public void ident_list() throws Exception {
-        eat(TokenType.IDENTIFIER);
+    public List<Identifier> ident_list() throws Exception {
+        var identifierList = new ArrayList<Identifier>();
+
+        var ident = identifier();
+        identifierList.add(ident);
 
         while (currentToken.TokenType.equals(TokenType.PUNCT_COLON)) {
             eat(TokenType.PUNCT_COLON);
-            eat(TokenType.IDENTIFIER);
+            ident = identifier();
+            identifierList.add(ident);
         }
+
+        return identifierList;
+    }
+
+    // ==> identifier <==
+    public Identifier identifier() throws Exception {
+        var token = eat(TokenType.IDENTIFIER);
+        return new Identifier(token);
     }
 
     // ==> int | float | char <==
-    @SuppressWarnings("DuplicatedCode")
-    public void type() throws Exception {
+    public SxExpressionType type() throws Exception {
         switch (currentToken.TokenType) {
             case TYPE_INT:
             case TYPE_FLOAT:
             case TYPE_CHAR:
-                eat(currentToken.TokenType);
-                break;
+                var token = eat(currentToken.TokenType);
+                return SxExpressionType.getType(token);
             default:
                 throw new SyntaxException(currentToken,
                         Arrays.asList(TokenType.TYPE_INT, TokenType.TYPE_FLOAT, TokenType.TYPE_CHAR));
@@ -162,12 +191,18 @@ public class SyntaxAnalyzer {
 
 
     // ==> stmt { stmt } <==
-    public void stmt_list() throws Exception {
-        stmt();
+    public StatementList stmt_list() throws Exception {
+        var stmtList = new StatementList();
+
+        var stmt = stmt();
+        stmtList.addElement(stmt);
 
         while (checkIfTokensAre_stmt()) {
-            stmt();
+            stmt = stmt();
+            stmtList.addElement(stmt);
         }
+
+        return stmtList;
     }
 
     // ==> { stmt } <==
@@ -182,35 +217,43 @@ public class SyntaxAnalyzer {
     }
 
     // ==> assign-stmt | if-stmt | while-stmt | repeat-stmt | read-stmt | write-stmt  ";" <==
-    public void stmt() throws Exception {
+    public Statement stmt() throws Exception {
+
+        // Creates an error expecting the end of the program case the current token is null
+        if (currentToken == null)
+            eat(TokenType.KEYWORD_END);
+
+        Statement stmt;
         switch (currentToken.TokenType) {
             case IDENTIFIER: //Assign Statement
-                assign_stmt();
+                stmt = assign_stmt();
                 break;
             case KEYWORD_IF:
-                if_stmt();
+                stmt = if_stmt();
                 break;
             case KEYWORD_WHILE:
-                while_stmt();
+                stmt = while_stmt();
                 break;
             case KEYWORD_REPEAT:
-                repeat_stmt();
+                stmt = repeat_stmt();
                 break;
             case KEYWORD_READ:
-                read_stmt();
+                stmt = read_stmt();
                 break;
             case KEYWORD_WRITE:
-                write_stmt();
+                stmt = write_stmt();
                 break;
             default:
                 throw new SyntaxException(currentToken, "Invalid Statement Syntax");
         }
         eat(TokenType.PUNCT_SEMICOLON);
+
+        return stmt;
     }
 
 
     // ==> identifier "=" simple_expr <==
-    public void assign_stmt() throws Exception {
+    public AssignStatement assign_stmt() throws Exception {
         eat(TokenType.IDENTIFIER);
         eat(TokenType.ASSIGN);
         simple_expr();
@@ -219,7 +262,7 @@ public class SyntaxAnalyzer {
 
     // ==>  if condition then stmt-list end
     // | if condition then stmt-list else stmt-list end <==
-    public void if_stmt() throws Exception {
+    public IfStatement if_stmt() throws Exception {
         eat(TokenType.KEYWORD_IF);
         condition();
         eat(TokenType.KEYWORD_THEN);
@@ -245,7 +288,7 @@ public class SyntaxAnalyzer {
 
 
     // ==> repeat stmt-list stmt-suffix <==
-    public void repeat_stmt() throws Exception {
+    public RepeatStatement repeat_stmt() throws Exception {
         eat(TokenType.KEYWORD_REPEAT);
         stmt_list();
         stmt_suffix();
@@ -258,7 +301,7 @@ public class SyntaxAnalyzer {
     }
 
     // ==> stmt-prefix stmt-list end <==
-    public void while_stmt() throws Exception {
+    public WhileStatement while_stmt() throws Exception {
         stmt_prefix();
         stmt_list();
         eat(TokenType.KEYWORD_END);
@@ -273,7 +316,7 @@ public class SyntaxAnalyzer {
 
 
     // ==> read "(" identifier ")" <==
-    public void read_stmt() throws Exception {
+    public ReadStatement read_stmt() throws Exception {
         eat(TokenType.KEYWORD_READ);
         eat(TokenType.PUNCT_PARENTHESIS_OPEN);
         eat(TokenType.IDENTIFIER);
@@ -281,7 +324,7 @@ public class SyntaxAnalyzer {
     }
 
     // ==> write "(" writable ")" <==
-    public void write_stmt() throws Exception {
+    public WriteStatement write_stmt() throws Exception {
         eat(TokenType.KEYWORD_WRITE);
         eat(TokenType.PUNCT_PARENTHESIS_OPEN);
         writable();
@@ -354,7 +397,7 @@ public class SyntaxAnalyzer {
     public void relop() throws Exception {
         var relopTokenTypes = TokenType.relopTokenTypes();
 
-        if(currentToken.TokenType.belongs(relopTokenTypes))
+        if (currentToken.TokenType.belongs(relopTokenTypes))
             eat(currentToken.TokenType);
         else
             throw new SyntaxException(currentToken, relopTokenTypes);
@@ -364,7 +407,7 @@ public class SyntaxAnalyzer {
     public void addop() throws Exception {
         var possibleTokenTypes = TokenType.addopTokenTypes();
 
-        if(currentToken.TokenType.belongs(possibleTokenTypes))
+        if (currentToken.TokenType.belongs(possibleTokenTypes))
             eat(currentToken.TokenType);
         else
             throw new SyntaxException(currentToken, possibleTokenTypes);
@@ -374,7 +417,7 @@ public class SyntaxAnalyzer {
     public void mulop() throws Exception {
         var possibleTokenTypes = TokenType.mulopTokenTypes();
 
-        if(currentToken.TokenType.belongs(possibleTokenTypes))
+        if (currentToken.TokenType.belongs(possibleTokenTypes))
             eat(currentToken.TokenType);
         else
             throw new SyntaxException(currentToken, possibleTokenTypes);
@@ -384,7 +427,7 @@ public class SyntaxAnalyzer {
     public void constant() throws Exception {
         var possibleTokenTypes = TokenType.constantTokenTypes();
 
-        if(currentToken.TokenType.belongs(possibleTokenTypes))
+        if (currentToken.TokenType.belongs(possibleTokenTypes))
             eat(currentToken.TokenType);
         else
             throw new SyntaxException(currentToken, possibleTokenTypes);

@@ -1,5 +1,6 @@
 package syntaxAnalyzer.syntaxTree.SxExpressions;
 
+import customExceptions.TreeExpressionException;
 import lexicalAnalyzer.Token;
 import lexicalAnalyzer.TokenType;
 
@@ -31,7 +32,7 @@ public class OperationSxExpression implements SxExpression {
             return lExpType;
 
         if(SxExpressionType.CHAR.equals(lExpType) || SxExpressionType.CHAR.equals(rExpType))
-            throw new Exception("Operation between Char and Float is Invalid");
+            throw new TreeExpressionException("Operation between Char and Float is Invalid");
 
         return SxExpressionType.FLOAT;
     }
