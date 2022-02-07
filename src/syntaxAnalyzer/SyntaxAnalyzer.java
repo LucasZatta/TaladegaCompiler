@@ -352,79 +352,41 @@ public class SyntaxAnalyzer {
 
     // ==> "==" | ">" | ">=" | "<" | "<=" | "!=" <==
     public void relop() throws Exception {
-        switch (currentToken.TokenType) {
-            case OPERATOR_EQ:
-            case OPERATOR_GR:
-            case OPERATOR_GREQ:
-            case OPERATOR_LS:
-            case OPERATOR_LSEQ:
-            case OPERATOR_NEQ:
-                eat(currentToken.TokenType);
-                break;
-            default:
-                throw new SyntaxException(currentToken,
-                        Arrays.asList(
-                                TokenType.OPERATOR_EQ,
-                                TokenType.OPERATOR_GR,
-                                TokenType.OPERATOR_GREQ,
-                                TokenType.OPERATOR_LS,
-                                TokenType.OPERATOR_LSEQ,
-                                TokenType.OPERATOR_NEQ));
-        }
+        var relopTokenTypes = TokenType.relopTokenTypes();
+
+        if(currentToken.TokenType.belongs(relopTokenTypes))
+            eat(currentToken.TokenType);
+        else
+            throw new SyntaxException(currentToken, relopTokenTypes);
     }
 
     // ==> "+" | "-" | || <==
-    @SuppressWarnings("DuplicatedCode")
     public void addop() throws Exception {
-        switch (currentToken.TokenType) {
-            case OPERATOR_PLUS:
-            case OPERATOR_MINUS:
-            case OPERATOR_OR:
-                eat(currentToken.TokenType);
-                break;
-            default:
-                throw new SyntaxException(currentToken,
-                        Arrays.asList(
-                                TokenType.OPERATOR_PLUS,
-                                TokenType.OPERATOR_MINUS,
-                                TokenType.OPERATOR_OR));
-        }
+        var possibleTokenTypes = TokenType.addopTokenTypes();
 
+        if(currentToken.TokenType.belongs(possibleTokenTypes))
+            eat(currentToken.TokenType);
+        else
+            throw new SyntaxException(currentToken, possibleTokenTypes);
     }
 
     // ==> "*" | "/" | && <==
-    @SuppressWarnings("DuplicatedCode")
     public void mulop() throws Exception {
-        switch (currentToken.TokenType) {
-            case OPERATOR_MUL:
-            case OPERATOR_DIV:
-            case OPERATOR_AND:
-                eat(currentToken.TokenType);
-                break;
-            default:
-                throw new SyntaxException(currentToken,
-                        Arrays.asList(
-                                TokenType.OPERATOR_MUL,
-                                TokenType.OPERATOR_DIV,
-                                TokenType.OPERATOR_AND));
-        }
+        var possibleTokenTypes = TokenType.mulopTokenTypes();
+
+        if(currentToken.TokenType.belongs(possibleTokenTypes))
+            eat(currentToken.TokenType);
+        else
+            throw new SyntaxException(currentToken, possibleTokenTypes);
     }
 
     // ==> integer_const | float_const | char_const <==
-    @SuppressWarnings("DuplicatedCode")
     public void constant() throws Exception {
-        switch (currentToken.TokenType) {
-            case INTEGER_CONST:
-            case FLOAT_CONST:
-            case CHAR_CONST:
-                eat(currentToken.TokenType);
-                break;
-            default:
-                throw new SyntaxException(currentToken,
-                        Arrays.asList(
-                                TokenType.INTEGER_CONST,
-                                TokenType.FLOAT_CONST,
-                                TokenType.CHAR_CONST));
-        }
+        var possibleTokenTypes = TokenType.constantTokenTypes();
+
+        if(currentToken.TokenType.belongs(possibleTokenTypes))
+            eat(currentToken.TokenType);
+        else
+            throw new SyntaxException(currentToken, possibleTokenTypes);
     }
 }
