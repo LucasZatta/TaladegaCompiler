@@ -5,12 +5,9 @@ import customExceptions.SyntaxException;
 import lexicalAnalyzer.LexicalAnalyzer;
 import lexicalAnalyzer.Token;
 import lexicalAnalyzer.TokenType;
-import syntaxAnalyzer.syntaxTree.Declaration;
-import syntaxAnalyzer.syntaxTree.DeclarationList;
-import syntaxAnalyzer.syntaxTree.Identifier;
-import syntaxAnalyzer.syntaxTree.Program;
+import syntaxAnalyzer.syntaxTree.*;
 import syntaxAnalyzer.syntaxTree.Statements.*;
-import syntaxAnalyzer.syntaxTree.SxExpressions.SxExpressionType;
+import syntaxAnalyzer.syntaxTree.SxExpressions.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,10 +24,14 @@ public class SyntaxAnalyzer {
     private int currentFakeScope = 0;
     private final Stack<FakeTokenWrapper> fakeTokenBuffer = new Stack<>();
 
+    private final SxTree syntaxTree = new SxTree();
+
     public SyntaxAnalyzer(LexicalAnalyzer lexicalAnalyzer) throws Exception {
         this.lexicalAnalyzer = lexicalAnalyzer;
         this.currentToken = lexicalAnalyzer.scan();
     }
+
+    // ========================================================
 
     private Token getNextToken() throws Exception {
         if (tokenBuffer.isEmpty())
@@ -113,8 +114,31 @@ public class SyntaxAnalyzer {
 
     }
 
-    public void Analyze() throws Exception {
+    // ========================================================
+
+    private void registerStatement(Statement statement) {
+        if (!fakeMovement)
+            this.syntaxTree.getStatements().add(statement);
+    }
+
+    private void registerIdentifier(Identifier identifier){
+        if(!fakeMovement)
+            this.syntaxTree.getIdentifiers().add(identifier);
+    }
+
+    private void registerDeclaration(Declaration declaration){
+        if(!fakeMovement)
+            this.syntaxTree.getDeclarations().add(declaration);
+    }
+
+    // ========================================================
+
+    public void analyze() throws Exception {
         program();
+    }
+
+    public SxTree getSyntaxTree(){
+        return syntaxTree;
     }
 
     // ========================================================
@@ -129,7 +153,9 @@ public class SyntaxAnalyzer {
         eat(TokenType.KEYWORD_END);
         eat(TokenType.PUNCT_DOT);
 
-        return new Program(stmtList, declList);
+        var program = new Program(stmtList, declList);
+        syntaxTree.setRoot(program);
+        return program;
     }
 
 
@@ -150,7 +176,9 @@ public class SyntaxAnalyzer {
         var identList = ident_list();
         eat(TokenType.KEYWORD_IS);
         var type = type();
-        return new Declaration(identList, type);
+        var decl = new Declaration(identList, type);
+        registerDeclaration(decl);
+        return decl;
     }
 
     // ==> identifier {"," identifier} <==
@@ -172,17 +200,18 @@ public class SyntaxAnalyzer {
     // ==> identifier <==
     public Identifier identifier() throws Exception {
         var token = eat(TokenType.IDENTIFIER);
-        return new Identifier(token);
+        var ident = new Identifier(token);
+        registerIdentifier(ident);
+        return ident;
     }
 
     // ==> int | float | char <==
-    public SxExpressionType type() throws Exception {
+    public Token type() throws Exception {
         switch (currentToken.TokenType) {
             case TYPE_INT:
             case TYPE_FLOAT:
             case TYPE_CHAR:
-                var token = eat(currentToken.TokenType);
-                return SxExpressionType.getType(token);
+                return eat(currentToken.TokenType);
             default:
                 throw new SyntaxException(currentToken,
                         Arrays.asList(TokenType.TYPE_INT, TokenType.TYPE_FLOAT, TokenType.TYPE_CHAR));
@@ -248,15 +277,18 @@ public class SyntaxAnalyzer {
         }
         eat(TokenType.PUNCT_SEMICOLON);
 
+        registerStatement(stmt);
         return stmt;
     }
 
 
     // ==> identifier "=" simple_expr <==
     public AssignStatement assign_stmt() throws Exception {
-        eat(TokenType.IDENTIFIER);
+        var ident = identifier();
         eat(TokenType.ASSIGN);
-        simple_expr();
+        var exp = simple_expr();
+
+        return new AssignStatement(ident, exp);
     }
 
 
@@ -264,54 +296,62 @@ public class SyntaxAnalyzer {
     // | if condition then stmt-list else stmt-list end <==
     public IfStatement if_stmt() throws Exception {
         eat(TokenType.KEYWORD_IF);
-        condition();
+        var cond = condition();
         eat(TokenType.KEYWORD_THEN);
-        stmt_list();
+        var stmtList = stmt_list();
+        StatementList stmtListElse = null;
         switch (currentToken.TokenType) {
             case KEYWORD_END:
                 eat(TokenType.KEYWORD_END);
                 break;
             case KEYWORD_ELSE:
                 eat(TokenType.KEYWORD_ELSE);
-                stmt_list();
+                stmtListElse = stmt_list();
                 eat(TokenType.KEYWORD_END);
                 break;
             default:
                 throw new SyntaxException(currentToken, Arrays.asList(TokenType.KEYWORD_END, TokenType.KEYWORD_ELSE));
         }
+
+        return new IfStatement(cond, stmtList, stmtListElse);
+
     }
 
     // ==> expression <==
-    public void condition() throws Exception {
-        expression();
+    public SxExpression condition() throws Exception {
+        return expression();
     }
 
 
     // ==> repeat stmt-list stmt-suffix <==
     public RepeatStatement repeat_stmt() throws Exception {
         eat(TokenType.KEYWORD_REPEAT);
-        stmt_list();
-        stmt_suffix();
+        var stmtList = stmt_list();
+        var cond = stmt_suffix();
+        return new RepeatStatement(cond,stmtList);
     }
 
     // ==> until conditionx <==
-    public void stmt_suffix() throws Exception {
+    public SxExpression stmt_suffix() throws Exception {
         eat(TokenType.KEYWORD_UNTIL);
-        condition();
+        return condition();
     }
+
 
     // ==> stmt-prefix stmt-list end <==
     public WhileStatement while_stmt() throws Exception {
-        stmt_prefix();
-        stmt_list();
+        var cond = stmt_prefix();
+        var stmtList = stmt_list();
         eat(TokenType.KEYWORD_END);
+        return new WhileStatement(cond,stmtList);
     }
 
     // ==> while condition do <==
-    public void stmt_prefix() throws Exception {
+    public SxExpression stmt_prefix() throws Exception {
         eat(TokenType.KEYWORD_WHILE);
-        condition();
+        var cond = condition();
         eat(TokenType.KEYWORD_DO);
+        return cond;
     }
 
 
@@ -319,117 +359,126 @@ public class SyntaxAnalyzer {
     public ReadStatement read_stmt() throws Exception {
         eat(TokenType.KEYWORD_READ);
         eat(TokenType.PUNCT_PARENTHESIS_OPEN);
-        eat(TokenType.IDENTIFIER);
+        var ident = identifier();
         eat(TokenType.PUNCT_PARENTHESIS_CLOSE);
+        return new ReadStatement(ident);
     }
 
     // ==> write "(" writable ")" <==
     public WriteStatement write_stmt() throws Exception {
         eat(TokenType.KEYWORD_WRITE);
         eat(TokenType.PUNCT_PARENTHESIS_OPEN);
-        writable();
+        var writable = writable();
         eat(TokenType.PUNCT_PARENTHESIS_CLOSE);
+        return new WriteStatement(writable);
     }
 
     // ==> simple-expr | literal <==
-    public void writable() throws Exception {
+    public SxExpression writable() throws Exception {
         if (currentToken.TokenType.equals(TokenType.LITERAL))
-            eat(TokenType.LITERAL);
+            return new ConstantSxExpression(eat(TokenType.LITERAL));
         else
-            simple_expr();
+            return simple_expr();
     }
 
 
     // ==> simple-expr | simple-expr relop simple-expr <==
-    public void expression() throws Exception {
-        simple_expr();
+    public SxExpression expression() throws Exception {
+        var leftExp = simple_expr();
         if (checkIfTokensAre_(this::relop)) {
-            relop();
-            expression();
-        }
+            var opToken = relop();
+            var rightExp = expression();
+            return new OperationSxExpression(leftExp, opToken, rightExp);
+        } else
+            return leftExp;
     }
 
     // ==> term | simple-expr addop term <==
-    public void simple_expr() throws Exception {
-        term();
+    public SxExpression simple_expr() throws Exception {
+        var leftExp = term();
         if (checkIfTokensAre_(this::addop)) {
-            addop();
-            simple_expr();
-        }
+            var opToken = addop();
+            var rightExp = simple_expr();
+            return new OperationSxExpression(leftExp, opToken, rightExp);
+        } else
+            return leftExp;
     }
 
     // ==> factor-a | term mulop factor-a <==
-    public void term() throws Exception {
-        factor_a();
+    public SxExpression term() throws Exception {
+        var leftExp = factor_a();
         if (checkIfTokensAre_(this::mulop)) {
-            mulop();
-            term();
-        }
+            var opToken = mulop();
+            var rightExp = term();
+            return new OperationSxExpression(leftExp, opToken, rightExp);
+        } else
+            return leftExp;
     }
 
     // ==> factor | ! factor | "-" factor <==
-    public void factor_a() throws Exception {
+    public SxExpression factor_a() throws Exception {
         switch (currentToken.TokenType) {
             case OPERATOR_EXCLAMATION:
             case OPERATOR_MINUS:
-                eat(currentToken.TokenType);
-                break;
+                var token = eat(currentToken.TokenType);
+                return new SingleTermOperationSxExpression(factor(), token);
             default:
-                break;
+                return factor();
         }
-        factor();
     }
 
     // ==> identifier | constant | "(" expression ")" <==
-    public void factor() throws Exception {
-        if (checkIfTokensAre_(this::constant))
-            constant();
-        else if (TokenType.IDENTIFIER.equals(currentToken.TokenType))
-            eat(TokenType.IDENTIFIER);
+    public SxExpression factor() throws Exception {
+        SxExpression exp;
+        if (TokenType.IDENTIFIER.equals(currentToken.TokenType))
+            exp = new IdentifierSxExpression(identifier());
         else if (TokenType.PUNCT_PARENTHESIS_OPEN.equals(currentToken.TokenType)) {
             eat(TokenType.PUNCT_PARENTHESIS_OPEN);
-            expression();
+            exp = expression();
             eat(TokenType.PUNCT_PARENTHESIS_CLOSE);
-        }
+        } else
+            exp = constant();
+
+        return exp;
     }
 
     // ==> "==" | ">" | ">=" | "<" | "<=" | "!=" <==
-    public void relop() throws Exception {
+    public Token relop() throws Exception {
         var relopTokenTypes = TokenType.relopTokenTypes();
 
         if (currentToken.TokenType.belongs(relopTokenTypes))
-            eat(currentToken.TokenType);
+            return eat(currentToken.TokenType);
         else
             throw new SyntaxException(currentToken, relopTokenTypes);
     }
 
     // ==> "+" | "-" | || <==
-    public void addop() throws Exception {
+    public Token addop() throws Exception {
         var possibleTokenTypes = TokenType.addopTokenTypes();
 
         if (currentToken.TokenType.belongs(possibleTokenTypes))
-            eat(currentToken.TokenType);
+            return eat(currentToken.TokenType);
         else
             throw new SyntaxException(currentToken, possibleTokenTypes);
     }
 
     // ==> "*" | "/" | && <==
-    public void mulop() throws Exception {
+    public Token mulop() throws Exception {
         var possibleTokenTypes = TokenType.mulopTokenTypes();
 
         if (currentToken.TokenType.belongs(possibleTokenTypes))
-            eat(currentToken.TokenType);
+            return eat(currentToken.TokenType);
         else
             throw new SyntaxException(currentToken, possibleTokenTypes);
     }
 
     // ==> integer_const | float_const | char_const <==
-    public void constant() throws Exception {
+    public ConstantSxExpression constant() throws Exception {
         var possibleTokenTypes = TokenType.constantTokenTypes();
 
-        if (currentToken.TokenType.belongs(possibleTokenTypes))
-            eat(currentToken.TokenType);
-        else
+        if (currentToken.TokenType.belongs(possibleTokenTypes)) {
+            return new ConstantSxExpression(eat(currentToken.TokenType));
+        } else
             throw new SyntaxException(currentToken, possibleTokenTypes);
     }
 }

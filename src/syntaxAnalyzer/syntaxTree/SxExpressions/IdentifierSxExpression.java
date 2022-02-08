@@ -1,16 +1,15 @@
 package syntaxAnalyzer.syntaxTree.SxExpressions;
 
-import lexicalAnalyzer.Token;
+import syntaxAnalyzer.syntaxTree.Identifier;
 
 public class IdentifierSxExpression implements SxExpression {
-    private final Token token;
+    private final Identifier identifier;
 
-    public IdentifierSxExpression(Token token) {
-        this.token = token;
+    public IdentifierSxExpression(Identifier identifier) {
+        this.identifier = identifier;
     }
 
-    @Override
-    public SxExpressionType getResultType() {
-        return SxExpressionType.getType(this.token);
+    public Identifier getIdentifier() {
+        return identifier;
     }
 }

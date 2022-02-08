@@ -32,7 +32,7 @@ public class Main {
             }
 
             if (TEST_SELECTOR == 1) {
-                syntaxAnalyzer.Analyze();
+                syntaxAnalyzer.analyze();
             }
 
         } catch (CompilerException e) {

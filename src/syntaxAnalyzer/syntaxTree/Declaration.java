@@ -1,16 +1,23 @@
 package syntaxAnalyzer.syntaxTree;
 
-import lexicalAnalyzer.TokenType;
-import syntaxAnalyzer.syntaxTree.SxExpressions.SxExpressionType;
+import lexicalAnalyzer.Token;
 
 import java.util.List;
 
 public class Declaration {
-    private List<Identifier> IdentifierList;
-    private SxExpressionType Type;
+    private final List<Identifier> identifierList;
+    private final Token typeToken;
 
-    public Declaration(List<Identifier> identifierList, SxExpressionType type) {
-        IdentifierList = identifierList;
-        Type = type;
+    public Declaration(List<Identifier> identifierList, Token typeToken) {
+        this.identifierList = identifierList;
+        this.typeToken = typeToken;
+    }
+
+    public List<Identifier> getIdentifierList() {
+        return identifierList;
+    }
+
+    public Token getTypeToken() {
+        return typeToken;
     }
 }

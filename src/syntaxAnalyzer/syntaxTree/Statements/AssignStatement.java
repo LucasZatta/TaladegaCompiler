@@ -3,7 +3,7 @@ package syntaxAnalyzer.syntaxTree.Statements;
 import syntaxAnalyzer.syntaxTree.Identifier;
 import syntaxAnalyzer.syntaxTree.SxExpressions.SxExpression;
 
-public class AssignStatement implements Statement {
+public class AssignStatement implements Statement, StatementWithValueExpression {
     private final Identifier ident;
     private final SxExpression expression;
 
@@ -12,11 +12,12 @@ public class AssignStatement implements Statement {
         this.expression = exp;
     }
 
-    public Identifier getIdentifier() {
+    public Identifier getIdent() {
         return ident;
     }
 
-    public SxExpression getExpression() {
+    @Override
+    public SxExpression getValueExpression() {
         return expression;
     }
 }

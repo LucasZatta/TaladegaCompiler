@@ -9,13 +9,7 @@ import java.util.stream.Collectors;
 public class SyntaxException extends CompilerException {
     private final int line;
     private final int column;
-    private Token token;
-    private String message = null;
-
-    @Override
-    public String getMessage() {
-        return message;
-    }
+    private final Token token;
 
     public SyntaxException(int line, int column, Token token, String message) {
         this.line = line;

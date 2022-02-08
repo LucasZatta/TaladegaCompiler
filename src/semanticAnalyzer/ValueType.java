@@ -1,23 +1,26 @@
-package syntaxAnalyzer.syntaxTree.SxExpressions;
+package semanticAnalyzer;
 
 import lexicalAnalyzer.Token;
 
-public enum SxExpressionType {
+public enum ValueType {
     INT,
     FLOAT,
-    CHAR;
+    CHAR,
+    CHAR_ARR;
 
-    public static SxExpressionType getType(Token token) {
+    public static ValueType getType(Token token) {
         switch (token.TokenType) {
             case TYPE_INT:
             case INTEGER_CONST:
-                return SxExpressionType.INT;
+                return ValueType.INT;
             case TYPE_FLOAT:
             case FLOAT_CONST:
-                return SxExpressionType.FLOAT;
+                return ValueType.FLOAT;
             case TYPE_CHAR:
             case CHAR_CONST:
-                return SxExpressionType.CHAR;
+                return ValueType.CHAR;
+            case LITERAL:
+                return ValueType.CHAR_ARR;
             default:
                 throw new RuntimeException("Invalid Token Type");
         }
