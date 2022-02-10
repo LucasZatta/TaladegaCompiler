@@ -12,4 +12,14 @@ public class IdentifierSxExpression implements SxExpression {
     public Identifier getIdentifier() {
         return identifier;
     }
+
+    @Override
+    public int getLineStart() {
+        return identifier.getToken().LineStart;
+    }
+
+    @Override
+    public int getColumnStart() {
+        return identifier.getToken().ColumnStart;
+    }
 }

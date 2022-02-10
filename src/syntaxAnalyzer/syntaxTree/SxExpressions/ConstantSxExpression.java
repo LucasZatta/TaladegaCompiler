@@ -12,4 +12,14 @@ public class ConstantSxExpression implements SxExpression {
     public Token getToken() {
         return token;
     }
+
+    @Override
+    public int getLineStart() {
+        return token.LineStart;
+    }
+
+    @Override
+    public int getColumnStart() {
+        return token.ColumnStart;
+    }
 }

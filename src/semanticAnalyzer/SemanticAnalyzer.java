@@ -3,8 +3,7 @@ package semanticAnalyzer;
 import customExceptions.SemanticException;
 import lexicalAnalyzer.Token;
 import lexicalAnalyzer.TokenType;
-import syntaxAnalyzer.syntaxTree.Statements.AssignStatement;
-import syntaxAnalyzer.syntaxTree.Statements.StatementWithValueExpression;
+import syntaxAnalyzer.syntaxTree.Statements.*;
 import syntaxAnalyzer.syntaxTree.SxExpressions.*;
 import syntaxAnalyzer.syntaxTree.SxTree;
 
@@ -51,25 +50,33 @@ public class SemanticAnalyzer {
 
     private void checkStatements() throws Exception {
         for (var stmt : syntaxTree.getStatements()) {
-            if (stmt instanceof StatementWithValueExpression) {
-                var valueExp = ((StatementWithValueExpression) stmt).getValueExpression();
-                var expValueType = getValueType(valueExp);
 
-                if (stmt instanceof AssignStatement) {
-                    var ident = ((AssignStatement) stmt).getIdent();
-                    var identType = identifiers.get(ident.getIdentifierCode());
+            if (!(stmt instanceof StatementWithValueExpression))
+                continue;
 
-                    if (!expValueType.equals(identType)
-                            && !identType.equals(ValueType.FLOAT)
-                            && !expValueType.equals(ValueType.INT))
-                        throw new SemanticException(
-                                ident.getToken().LineStart,
-                                ident.getToken().ColumnStart,
-                                "Cant assign type '" + expValueType +
-                                        "' to identifier declared as '" + identType + "'.");
-                }
+            var valueExp = ((StatementWithValueExpression) stmt).getValueExpression();
+            var expValueType = getValueType(valueExp);
+
+            if (stmt instanceof AssignStatement) {
+                var ident = ((AssignStatement) stmt).getIdent();
+                var identType = identifiers.get(ident.getIdentifierCode());
+
+                if (!expValueType.equals(identType)
+                        && !identType.equals(ValueType.FLOAT)
+                        && !expValueType.equals(ValueType.INT))
+                    throw new SemanticException(
+                            ident.getToken().LineStart,
+                            ident.getToken().ColumnStart,
+                            "Cant assign type '" + expValueType +
+                                    "' to identifier declared as '" + identType + "'.");
             }
-// TODO: Finish statements
+
+            if (stmt instanceof IfStatement || stmt instanceof RepeatStatement || stmt instanceof WhileStatement)
+                if (!(expValueType.equals(ValueType.INT) || expValueType.equals(ValueType.FLOAT)))
+                    throw new SemanticException(
+                            valueExp.getLineStart(),
+                            valueExp.getColumnStart(),
+                            "Expression result type can't be evaluated in a condition");
         }
     }
 
@@ -92,7 +99,7 @@ public class SemanticAnalyzer {
 
             var secondExpType = getValueType(opExpression.getSecondExpression());
 
-            return evaluate(firstExpType, opToken, null);
+            return evaluate(firstExpType, opToken, secondExpType);
         }
 
         throw new Exception("Invalid Syntax tree exception class");

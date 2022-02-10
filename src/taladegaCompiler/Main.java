@@ -3,10 +3,11 @@ package taladegaCompiler;
 import customExceptions.CompilerException;
 import lexicalAnalyzer.LexicalAnalyzer;
 import lexicalAnalyzer.SymbolTable;
+import semanticAnalyzer.SemanticAnalyzer;
 import syntaxAnalyzer.SyntaxAnalyzer;
 
 public class Main {
-    public static final int TEST_SELECTOR = 1; // 0 = 'LEXICAL_ANALYZER'; 1 = 'SYNTAX_ANALYZER'
+    public static final int TEST_SELECTOR = 2; // 0 = 'LEXICAL_ANALYZER'; 1 = 'SYNTAX_ANALYZER'; 2 = 'SEMANTIC_ANALYZER'
 
     public static void main(String[] args) throws Exception {
         var fileName = "input.txt";
@@ -31,8 +32,14 @@ public class Main {
                 symbolTable.print();
             }
 
-            if (TEST_SELECTOR == 1) {
+            if (TEST_SELECTOR == 1 || TEST_SELECTOR == 2) {
                 syntaxAnalyzer.analyze();
+            }
+
+            var semanticAnalyzer = new SemanticAnalyzer(syntaxAnalyzer.getSyntaxTree());
+
+            if (TEST_SELECTOR == 2) {
+                semanticAnalyzer.analyze();
             }
 
         } catch (CompilerException e) {

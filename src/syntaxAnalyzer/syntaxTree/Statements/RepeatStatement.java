@@ -2,7 +2,7 @@ package syntaxAnalyzer.syntaxTree.Statements;
 
 import syntaxAnalyzer.syntaxTree.SxExpressions.SxExpression;
 
-public class RepeatStatement implements Statement, StatementWithCondition {
+public class RepeatStatement implements Statement, StatementWithValueExpression {
     private final SxExpression condition;
     private final StatementList stmtList;
 
@@ -12,7 +12,7 @@ public class RepeatStatement implements Statement, StatementWithCondition {
     }
 
     @Override
-    public SxExpression getCondition() {
+    public SxExpression getValueExpression() {
         return condition;
     }
 }
