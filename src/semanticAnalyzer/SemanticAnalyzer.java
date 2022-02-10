@@ -17,9 +17,10 @@ public class SemanticAnalyzer {
         this.syntaxTree = syntaxTree;
     }
 
-    public void analyze() throws SemanticException {
+    public void analyze() throws Exception {
         checkDeclarations();
         checkIdentifiers();
+        checkStatements();
     }
 
     private void checkDeclarations() throws SemanticException {
